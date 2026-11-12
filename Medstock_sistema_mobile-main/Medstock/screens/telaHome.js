@@ -38,13 +38,6 @@ const API_BASE_URL = 'http://10.0.2.2:5000';
 // ============================================================
 // API DO DASHBOARD
 // ============================================================
-//
-// ESTA API CONTINUA SENDO A RESPONSÁVEL PELOS DADOS
-// PRINCIPAIS DA HOME.
-//
-// NÃO FOI ALTERADA.
-//
-// ============================================================
 
 const API_DASHBOARD =
   `${API_BASE_URL}/api/dashboard`;
@@ -53,13 +46,23 @@ const API_DASHBOARD =
 // ============================================================
 // API DE MOVIMENTAÇÕES
 // ============================================================
-//
-// USADA SOMENTE PARA A BUSCA.
-//
-// ============================================================
 
 const API_MOVIMENTACOES =
   `${API_BASE_URL}/api/movimentacoes`;
+
+
+// ============================================================
+// APIs DO FLUXO
+// ============================================================
+
+const API_FORNECEDORES =
+  `${API_BASE_URL}/api/fornecedores`;
+
+const API_PRODUTOS =
+  `${API_BASE_URL}/api/produtos`;
+
+const API_CLIENTES =
+  `${API_BASE_URL}/api/clientes`;
 
 
 // ============================================================
@@ -162,6 +165,14 @@ export default function telaHome({
 
 
   // ==========================================================
+  // ESTADO DAS NOTIFICAÇÕES
+  // ==========================================================
+
+  const [mostrarNotificacoes, setMostrarNotificacoes] =
+    useState(false);
+
+
+  // ==========================================================
   // ESTADOS DA BUSCA
   // ==========================================================
 
@@ -176,6 +187,23 @@ export default function telaHome({
 
   const [buscando, setBuscando] =
     useState(false);
+
+
+  // ==========================================================
+  // ESTADOS DO FLUXO
+  // ==========================================================
+
+  const [fluxoSelecionado, setFluxoSelecionado] =
+    useState(null);
+
+  const [dadosFluxo, setDadosFluxo] =
+    useState([]);
+
+  const [carregandoFluxo, setCarregandoFluxo] =
+    useState(false);
+
+  const [erroFluxo, setErroFluxo] =
+    useState(null);
 
 
   // ==========================================================
@@ -203,16 +231,6 @@ export default function telaHome({
 
   // ==========================================================
   // BUSCAR DADOS DO DASHBOARD
-  // ==========================================================
-  //
-  // IMPORTANTE:
-  //
-  // ESTA PARTE CONTINUA USANDO:
-  //
-  // /api/dashboard
-  //
-  // Ela NÃO usa /api/movimentacoes.
-  //
   // ==========================================================
 
   const carregarDados = useCallback(
@@ -346,6 +364,28 @@ export default function telaHome({
 
 
   // ==========================================================
+  // ATUALIZAÇÃO AUTOMÁTICA
+  // ==========================================================
+
+  useEffect(() => {
+
+    const intervalo = setInterval(() => {
+
+      carregarDados(false);
+
+    }, 30000);
+
+
+    return () => {
+
+      clearInterval(intervalo);
+
+    };
+
+  }, [carregarDados]);
+
+
+  // ==========================================================
   // ATUALIZAR DASHBOARD
   // ==========================================================
 
@@ -363,15 +403,218 @@ export default function telaHome({
 
 
   // ==========================================================
-  // BUSCA
+  // ABRIR FLUXO
   // ==========================================================
-  //
-  // A BUSCA USA SOMENTE:
-  //
-  // /api/movimentacoes
-  //
-  // Não altera a API do dashboard.
-  //
+
+  const abrirFluxo = async (tipo) => {
+
+    setFluxoSelecionado(tipo);
+
+    setDadosFluxo([]);
+
+    setErroFluxo(null);
+
+    setCarregandoFluxo(true);
+
+
+    let url = '';
+
+    let titulo = '';
+
+
+    if (tipo === 'Receber') {
+
+      url = API_FORNECEDORES;
+
+      titulo = 'Fornecedores';
+
+    }
+
+
+    if (tipo === 'Armazenar') {
+
+      url = API_PRODUTOS;
+
+      titulo = 'Produtos cadastrados';
+
+    }
+
+
+    if (tipo === 'Distribuir') {
+
+      url = API_CLIENTES;
+
+      titulo = 'Clientes';
+
+    }
+
+
+    try {
+
+      console.log(
+        '===================================='
+      );
+
+      console.log(
+        'CONSULTANDO FLUXO'
+      );
+
+      console.log(
+        'TIPO:',
+        tipo
+      );
+
+      console.log(
+        'URL:',
+        url
+      );
+
+      console.log(
+        '===================================='
+      );
+
+
+      const resposta =
+        await fetch(
+          url,
+          {
+            method: 'GET',
+
+            headers: {
+              Accept: 'application/json',
+            },
+          }
+        );
+
+
+      if (!resposta.ok) {
+
+        throw new Error(
+          `Erro HTTP ${resposta.status}`
+        );
+
+      }
+
+
+      const json =
+        await resposta.json();
+
+
+      console.log(
+        '===================================='
+      );
+
+      console.log(
+        'DADOS DO FLUXO:'
+      );
+
+      console.log(json);
+
+      console.log(
+        '===================================='
+      );
+
+
+      if (!json.sucesso) {
+
+        throw new Error(
+          json.erro ||
+          `Erro ao carregar ${titulo}.`
+        );
+
+      }
+
+
+      let lista = [];
+
+
+      if (tipo === 'Receber') {
+
+        lista =
+          Array.isArray(
+            json.fornecedores
+          )
+            ? json.fornecedores
+            : [];
+
+      }
+
+
+      if (tipo === 'Armazenar') {
+
+        lista =
+          Array.isArray(
+            json.produtos
+          )
+            ? json.produtos
+            : [];
+
+      }
+
+
+      if (tipo === 'Distribuir') {
+
+        lista =
+          Array.isArray(
+            json.clientes
+          )
+            ? json.clientes
+            : [];
+
+      }
+
+
+      setDadosFluxo(lista);
+
+
+    } catch (error) {
+
+      console.log(
+        '===================================='
+      );
+
+      console.log(
+        'ERRO AO CARREGAR FLUXO:'
+      );
+
+      console.log(error);
+
+      console.log(
+        '===================================='
+      );
+
+
+      setErroFluxo(
+        `Não foi possível carregar ${titulo.toLowerCase()}.`
+      );
+
+
+    } finally {
+
+      setCarregandoFluxo(false);
+
+    }
+
+  };
+
+
+  // ==========================================================
+  // FECHAR FLUXO
+  // ==========================================================
+
+  const fecharFluxo = () => {
+
+    setFluxoSelecionado(null);
+
+    setDadosFluxo([]);
+
+    setErroFluxo(null);
+
+  };
+
+
+  // ==========================================================
+  // BUSCA
   // ==========================================================
 
   const executarBusca = useCallback(
@@ -382,10 +625,6 @@ export default function telaHome({
           .trim()
           .toLowerCase();
 
-
-      // ======================================================
-      // BUSCA VAZIA
-      // ======================================================
 
       if (!termo) {
 
@@ -426,10 +665,6 @@ export default function telaHome({
           '===================================='
         );
 
-
-        // ====================================================
-        // CONSULTAR MOVIMENTAÇÕES
-        // ====================================================
 
         const resposta =
           await fetch(
@@ -490,10 +725,6 @@ export default function telaHome({
             : [];
 
 
-        // ====================================================
-        // FILTRAR RESULTADOS
-        // ====================================================
-
         const resultados =
           movimentacoes.filter(
             (item) => {
@@ -540,10 +771,6 @@ export default function telaHome({
           );
 
 
-        // ====================================================
-        // LIMITAR RESULTADOS
-        // ====================================================
-
         const resultadosLimitados =
           resultados.slice(0, 8);
 
@@ -554,17 +781,10 @@ export default function telaHome({
         );
 
 
-        // ====================================================
-        // RESULTADOS
-        // ====================================================
-
         setProdutosBusca(
           resultadosLimitados
         );
 
-
-        // O parceiro da saída já vem como cliente
-        // dentro das movimentações.
 
         setClientesBusca([]);
 
@@ -648,16 +868,12 @@ export default function telaHome({
     );
 
 
-    // Limpar busca
-
     setBusca('');
 
     setProdutosBusca([]);
 
     setClientesBusca([]);
 
-
-    // Abrir a aba de movimentação
 
     navigation.navigate(
       'mov',
@@ -964,8 +1180,6 @@ export default function telaHome({
           </View>
 
 
-          {/* ATUALIZAR */}
-
           <TouchableOpacity
             style={styles.iconBtn}
             activeOpacity={0.8}
@@ -993,11 +1207,12 @@ export default function telaHome({
           </TouchableOpacity>
 
 
-          {/* NOTIFICAÇÃO */}
-
           <TouchableOpacity
             style={styles.iconBtn}
             activeOpacity={0.8}
+            onPress={() => {
+              setMostrarNotificacoes(true);
+            }}
           >
 
             <Feather
@@ -1005,7 +1220,6 @@ export default function telaHome({
               size={20}
               color={C.deep}
             />
-
 
             {quantidadeAlertas > 0 && (
 
@@ -1101,9 +1315,6 @@ export default function telaHome({
           style={styles.hero}
         >
 
-
-          {/* STATUS */}
-
           <View
             style={styles.badge}
           >
@@ -1133,8 +1344,6 @@ export default function telaHome({
 
           </View>
 
-
-          {/* TÍTULO */}
 
           <Text
             style={styles.heroTitle}
@@ -1433,9 +1642,13 @@ export default function telaHome({
 
           {FLOW.map((item) => (
 
-            <View
+            <TouchableOpacity
               key={item.title}
               style={styles.flowCard}
+              activeOpacity={0.8}
+              onPress={() => {
+                abrirFluxo(item.title);
+              }}
             >
 
               <View
@@ -1464,7 +1677,7 @@ export default function telaHome({
                 {item.desc}
               </Text>
 
-            </View>
+            </TouchableOpacity>
 
           ))}
 
@@ -1478,8 +1691,6 @@ export default function telaHome({
         <View
           style={styles.metricsContainer}
         >
-
-          {/* PRODUTOS */}
 
           <View
             style={styles.metricCard}
@@ -1541,8 +1752,6 @@ export default function telaHome({
           </View>
 
 
-          {/* ENTRADAS */}
-
           <View
             style={styles.metricCard}
           >
@@ -1602,8 +1811,6 @@ export default function telaHome({
 
           </View>
 
-
-          {/* SAÍDAS */}
 
           <View
             style={styles.metricCard}
@@ -1745,19 +1952,548 @@ export default function telaHome({
 
       </ScrollView>
 
-      {/*
-        ======================================================
-        IMPORTANTE
 
-        O Bottom Tab não fica mais aqui.
+      {/* ======================================================
+          NOTIFICAÇÕES
+      ====================================================== */}
 
-        Ele será criado no App.js usando:
+      {mostrarNotificacoes && (
 
-        createBottomTabNavigator()
+        <View
+          style={styles.notificationOverlay}
+        >
 
-        Portanto a Home termina aqui.
-        ======================================================
-      */}
+          <View
+            style={styles.notificationBox}
+          >
+
+            <View
+              style={styles.notificationHeader}
+            >
+
+              <Text
+                style={styles.notificationTitle}
+              >
+                Notificações
+              </Text>
+
+
+              <TouchableOpacity
+                onPress={() => {
+                  setMostrarNotificacoes(false);
+                }}
+              >
+
+                <Feather
+                  name="x"
+                  size={22}
+                  color={C.deep}
+                />
+
+              </TouchableOpacity>
+
+            </View>
+
+
+            {produtosCriticos.map(
+              (item, index) => (
+
+                <View
+                  key={`critico-${index}`}
+                  style={
+                    styles.notificationItem
+                  }
+                >
+
+                  <Feather
+                    name="alert-triangle"
+                    size={20}
+                    color={C.red}
+                  />
+
+
+                  <View
+                    style={
+                      styles.notificationText
+                    }
+                  >
+
+                    <Text
+                      style={
+                        styles.notificationItemTitle
+                      }
+                    >
+                      Estoque crítico
+                    </Text>
+
+
+                    <Text
+                      style={
+                        styles.notificationItemText
+                      }
+                    >
+                      {item?.nome ||
+                        item?.produto ||
+                        item?.name ||
+                        'Produto'}
+
+                      {' '}está com estoque crítico.
+                    </Text>
+
+                  </View>
+
+                </View>
+
+              )
+            )}
+
+
+            {produtosBaixo.map(
+              (item, index) => (
+
+                <View
+                  key={`baixo-${index}`}
+                  style={
+                    styles.notificationItem
+                  }
+                >
+
+                  <Feather
+                    name="alert-circle"
+                    size={20}
+                    color={C.warn}
+                  />
+
+
+                  <View
+                    style={
+                      styles.notificationText
+                    }
+                  >
+
+                    <Text
+                      style={
+                        styles.notificationItemTitle
+                      }
+                    >
+                      Estoque baixo
+                    </Text>
+
+
+                    <Text
+                      style={
+                        styles.notificationItemText
+                      }
+                    >
+                      {item?.nome ||
+                        item?.produto ||
+                        item?.name ||
+                        'Produto'}
+
+                      {' '}está com estoque baixo.
+                    </Text>
+
+                  </View>
+
+                </View>
+
+              )
+            )}
+
+
+            {quantidadeAlertas === 0 && (
+
+              <View
+                style={
+                  styles.noNotification
+                }
+              >
+
+                <Feather
+                  name="check-circle"
+                  size={30}
+                  color={C.green}
+                />
+
+
+                <Text
+                  style={
+                    styles.noNotificationText
+                  }
+                >
+                  Nenhuma notificação no momento.
+                </Text>
+
+              </View>
+
+            )}
+
+          </View>
+
+        </View>
+
+      )}
+
+
+      {/* ======================================================
+          LISTA DO FLUXO
+      ====================================================== */}
+
+      {fluxoSelecionado && (
+
+        <View
+          style={styles.fluxoOverlay}
+        >
+
+          <View
+            style={styles.fluxoBox}
+          >
+
+            {/* CABEÇALHO */}
+
+            <View
+              style={styles.fluxoHeader}
+            >
+
+              <View
+                style={{
+                  flex: 1,
+                }}
+              >
+
+                <Text
+                  style={styles.fluxoTitle}
+                >
+                  {fluxoSelecionado === 'Receber'
+                    ? 'Fornecedores'
+                    : fluxoSelecionado === 'Armazenar'
+                    ? 'Produtos cadastrados'
+                    : 'Clientes'}
+                </Text>
+
+
+                <Text
+                  style={styles.fluxoSubtitle}
+                >
+                  {fluxoSelecionado === 'Receber'
+                    ? 'Fornecedores cadastrados no sistema'
+                    : fluxoSelecionado === 'Armazenar'
+                    ? 'Produtos cadastrados no estoque'
+                    : 'Clientes cadastrados no sistema'}
+                </Text>
+
+              </View>
+
+
+              <TouchableOpacity
+                onPress={fecharFluxo}
+                style={styles.fluxoClose}
+              >
+
+                <Feather
+                  name="x"
+                  size={22}
+                  color={C.deep}
+                />
+
+              </TouchableOpacity>
+
+            </View>
+
+
+            {/* CARREGANDO */}
+
+            {carregandoFluxo && (
+
+              <View
+                style={styles.fluxoLoading}
+              >
+
+                <ActivityIndicator
+                  size="large"
+                  color={C.brand}
+                />
+
+
+                <Text
+                  style={styles.fluxoLoadingText}
+                >
+                  Carregando informações...
+                </Text>
+
+              </View>
+
+            )}
+
+
+            {/* ERRO */}
+
+            {!carregandoFluxo &&
+              erroFluxo && (
+
+                <View
+                  style={styles.fluxoEmpty}
+                >
+
+                  <Feather
+                    name="wifi-off"
+                    size={30}
+                    color={C.red}
+                  />
+
+
+                  <Text
+                    style={styles.fluxoEmptyTitle}
+                  >
+                    Erro ao carregar
+                  </Text>
+
+
+                  <Text
+                    style={styles.fluxoEmptyText}
+                  >
+                    {erroFluxo}
+                  </Text>
+
+                </View>
+
+              )}
+
+
+            {/* LISTA */}
+
+            {!carregandoFluxo &&
+              !erroFluxo && (
+
+                <ScrollView
+                  style={styles.fluxoList}
+                  showsVerticalScrollIndicator={false}
+                >
+
+                  {dadosFluxo.length > 0 ? (
+
+                    dadosFluxo.map(
+                      (item, index) => (
+
+                        <View
+                          key={
+                            `${item?.id || 'item'}-${index}`
+                          }
+                          style={styles.fluxoItem}
+                        >
+
+                          <View
+                            style={styles.fluxoItemIcon}
+                          >
+
+                            <MaterialCommunityIcons
+                              name={
+                                fluxoSelecionado === 'Receber'
+                                  ? 'truck-outline'
+                                  : fluxoSelecionado === 'Armazenar'
+                                  ? 'pill'
+                                  : 'account-outline'
+                              }
+                              size={21}
+                              color={C.deep}
+                            />
+
+                          </View>
+
+
+                          <View
+                            style={
+                              styles.fluxoItemContent
+                            }
+                          >
+
+                            {/* FORNECEDOR */}
+
+                            {fluxoSelecionado ===
+                              'Receber' && (
+
+                              <>
+
+                                <Text
+                                  style={
+                                    styles.fluxoItemTitle
+                                  }
+                                >
+                                  {item?.nome_fornecedor ||
+                                    item?.nome ||
+                                    'Fornecedor'}
+                                </Text>
+
+
+                                <Text
+                                  style={
+                                    styles.fluxoItemText
+                                  }
+                                >
+                                  CNPJ: {item?.cnpj ||
+                                    'Não informado'}
+                                </Text>
+
+
+                                <Text
+                                  style={
+                                    styles.fluxoItemText
+                                  }
+                                >
+                                  E-mail: {item?.email ||
+                                    'Não informado'}
+                                </Text>
+
+                              </>
+
+                            )}
+
+
+                            {/* PRODUTO */}
+
+                            {fluxoSelecionado ===
+                              'Armazenar' && (
+
+                              <>
+
+                                <Text
+                                  style={
+                                    styles.fluxoItemTitle
+                                  }
+                                >
+                                  {item?.nome ||
+                                    'Produto'}
+                                </Text>
+
+
+                                <Text
+                                  style={
+                                    styles.fluxoItemText
+                                  }
+                                >
+                                  Categoria: {item?.categoria ||
+                                    'Não informada'}
+                                </Text>
+
+
+                                <Text
+                                  style={
+                                    styles.fluxoItemText
+                                  }
+                                >
+                                  Estoque: {item?.quantidade_estoque ??
+                                    0}
+                                </Text>
+
+                              </>
+
+                            )}
+
+
+                            {/* CLIENTE */}
+
+                            {fluxoSelecionado ===
+                              'Distribuir' && (
+
+                              <>
+
+                                <Text
+                                  style={
+                                    styles.fluxoItemTitle
+                                  }
+                                >
+                                  {item?.nome ||
+                                    'Cliente'}
+                                </Text>
+
+
+                                <Text
+                                  style={
+                                    styles.fluxoItemText
+                                  }
+                                >
+                                  CPF: {item?.cpf ||
+                                    'Não informado'}
+                                </Text>
+
+
+                                <Text
+                                  style={
+                                    styles.fluxoItemText
+                                  }
+                                >
+                                  Telefone: {item?.telefone ||
+                                    'Não informado'}
+                                </Text>
+
+
+                                <Text
+                                  style={
+                                    styles.fluxoItemText
+                                  }
+                                >
+                                  {item?.cidade ||
+                                    ''}
+
+                                  {item?.cidade &&
+                                    item?.estado
+                                    ? ' - '
+                                    : ''}
+
+                                  {item?.estado ||
+                                    ''}
+                                </Text>
+
+                              </>
+
+                            )}
+
+                          </View>
+
+                        </View>
+
+                      )
+                    )
+
+                  ) : (
+
+                    <View
+                      style={styles.fluxoEmpty}
+                    >
+
+                      <Feather
+                        name="inbox"
+                        size={32}
+                        color={C.muted}
+                      />
+
+
+                      <Text
+                        style={styles.fluxoEmptyTitle}
+                      >
+                        Nenhum cadastro encontrado
+                      </Text>
+
+
+                      <Text
+                        style={styles.fluxoEmptyText}
+                      >
+                        Não existem registros cadastrados no sistema.
+                      </Text>
+
+                    </View>
+
+                  )}
+
+                </ScrollView>
+
+              )}
+
+          </View>
+
+        </View>
+
+      )}
 
     </SafeAreaView>
 
@@ -1808,16 +2544,9 @@ const styles = StyleSheet.create({
   },
 
 
-  // ========================================================
-  // SCROLL
-  // ========================================================
-
   scroll: {
     padding: 20,
-
-    // Espaço para o BottomTabNavigator
     paddingBottom: 35,
-
     gap: 22,
   },
 
@@ -1828,39 +2557,29 @@ const styles = StyleSheet.create({
 
   loadingContainer: {
     flex: 1,
-
     alignItems: 'center',
-
     justifyContent: 'center',
-
     padding: 30,
   },
 
   loadingIcon: {
     width: 70,
     height: 70,
-
     borderRadius: 22,
-
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   loadingTitle: {
     fontSize: 22,
-
     fontWeight: '800',
-
     color: C.deep,
-
     marginTop: 14,
   },
 
   loadingText: {
     fontSize: 13,
-
     color: C.muted,
-
     marginTop: 4,
   },
 
@@ -1871,55 +2590,38 @@ const styles = StyleSheet.create({
 
   errorBox: {
     flexDirection: 'row',
-
     alignItems: 'center',
-
     gap: 10,
-
     backgroundColor: '#FFF0F0',
-
     borderWidth: 1,
-
     borderColor: '#FFD2D2',
-
     borderRadius: 16,
-
     padding: 12,
-
     marginTop: 4,
   },
 
   errorTitle: {
     fontSize: 12,
-
     fontWeight: '700',
-
     color: '#B42318',
   },
 
   errorText: {
     fontSize: 11,
-
     color: '#7A271A',
-
     marginTop: 2,
   },
 
   retryButton: {
     backgroundColor: C.red,
-
     paddingHorizontal: 10,
-
     paddingVertical: 7,
-
     borderRadius: 9,
   },
 
   retryText: {
     color: C.white,
-
     fontSize: 11,
-
     fontWeight: '700',
   },
 
@@ -1930,58 +2632,41 @@ const styles = StyleSheet.create({
 
   topbar: {
     flexDirection: 'row',
-
     alignItems: 'center',
-
     gap: 10,
   },
 
   iconBtn: {
     width: 45,
     height: 45,
-
     borderRadius: 14,
-
     backgroundColor: '#E9F2F5',
-
     alignItems: 'center',
-
     justifyContent: 'center',
   },
 
   dot: {
     position: 'absolute',
-
     top: 8,
     right: 8,
-
     width: 8,
     height: 8,
-
     borderRadius: 4,
-
     backgroundColor: C.red,
-
     borderWidth: 1,
-
     borderColor: C.white,
   },
 
   topLabel: {
     fontSize: 12,
-
     letterSpacing: 1.5,
-
     color: C.muted,
-
     fontWeight: '600',
   },
 
   topTitle: {
     fontSize: 17,
-
     fontWeight: '700',
-
     color: C.text,
   },
 
@@ -1992,66 +2677,47 @@ const styles = StyleSheet.create({
 
   hero: {
     borderRadius: 26,
-
     padding: 17,
-
     overflow: 'visible',
-
     zIndex: 10,
   },
 
   badge: {
     flexDirection: 'row',
-
     alignItems: 'center',
-
     gap: 6,
-
     alignSelf: 'flex-start',
-
     backgroundColor:
       'rgba(255,255,255,0.18)',
-
     paddingHorizontal: 12,
-
     paddingVertical: 5,
-
     borderRadius: 999,
   },
 
   badgeDot: {
     width: 6,
     height: 6,
-
     borderRadius: 3,
   },
 
   badgeText: {
     color: C.white,
-
     fontSize: 11,
-
     fontWeight: '700',
-
     letterSpacing: 1.2,
   },
 
   heroTitle: {
     color: C.white,
-
     fontSize: 27,
-
     fontWeight: '800',
-
     marginTop: 12,
   },
 
   heroSub: {
     color:
       'rgba(255,255,255,0.85)',
-
     fontSize: 15,
-
     marginTop: 4,
   },
 
@@ -2062,30 +2728,20 @@ const styles = StyleSheet.create({
 
   search: {
     flexDirection: 'row',
-
     alignItems: 'center',
-
     gap: 8,
-
     marginTop: 16,
-
     backgroundColor:
       'rgba(255,255,255,0.16)',
-
     borderRadius: 16,
-
     paddingHorizontal: 13,
-
     paddingVertical: 14,
   },
 
   searchInput: {
     flex: 1,
-
     color: C.white,
-
     fontSize: 15,
-
     padding: 0,
   },
 
@@ -2096,25 +2752,17 @@ const styles = StyleSheet.create({
 
   searchLoading: {
     flexDirection: 'row',
-
     alignItems: 'center',
-
     gap: 8,
-
     marginTop: 8,
-
     backgroundColor: C.white,
-
     borderRadius: 14,
-
     paddingHorizontal: 14,
-
     paddingVertical: 12,
   },
 
   searchLoadingText: {
     fontSize: 12,
-
     color: C.muted,
   },
 
@@ -2125,125 +2773,85 @@ const styles = StyleSheet.create({
 
   searchResults: {
     marginTop: 8,
-
     backgroundColor: C.white,
-
     borderRadius: 16,
-
     padding: 8,
-
     overflow: 'hidden',
-
     shadowColor: '#000',
-
     shadowOpacity: 0.15,
-
     shadowRadius: 10,
-
     shadowOffset: {
       width: 0,
       height: 5,
     },
-
     elevation: 8,
   },
 
   searchCategory: {
     fontSize: 13,
-
     fontWeight: '800',
-
     letterSpacing: 1.1,
-
     color: C.muted,
-
     paddingHorizontal: 8,
-
     paddingTop: 5,
-
     paddingBottom: 7,
   },
 
   searchItem: {
     flexDirection: 'row',
-
     alignItems: 'center',
-
     gap: 10,
-
     paddingHorizontal: 8,
-
     paddingVertical: 10,
-
     borderTopWidth: 1,
-
     borderTopColor: C.border,
   },
 
   searchItemIcon: {
     width: 45,
     height: 45,
-
     borderRadius: 12,
-
     backgroundColor: '#EAF4F6',
-
     alignItems: 'center',
-
     justifyContent: 'center',
   },
 
   searchItemTitle: {
     fontSize: 17,
-
     fontWeight: '700',
-
     color: C.deep,
   },
 
   searchItemPartner: {
     fontSize: 15,
-
     color: C.text,
-
     marginTop: 2,
   },
 
   searchItemInfo: {
     fontSize: 13.5,
-
     color: C.muted,
-
     marginTop: 3,
   },
 
   noResults: {
     alignItems: 'center',
-
     justifyContent: 'center',
-
     paddingHorizontal: 15,
-
     paddingVertical: 20,
   },
 
   noResultsTitle: {
     fontSize: 14,
-
     fontWeight: '700',
-
     color: C.text,
-
     marginTop: 7,
   },
 
   noResultsText: {
     fontSize: 11,
-
     color: C.muted,
-
     textAlign: 'center',
-
     marginTop: 3,
   },
 
@@ -2254,11 +2862,8 @@ const styles = StyleSheet.create({
 
   section: {
     fontSize: 12,
-
     letterSpacing: 1.4,
-
     fontWeight: '700',
-
     color: C.muted,
   },
 
@@ -2269,52 +2874,37 @@ const styles = StyleSheet.create({
 
   flowRow: {
     flexDirection: 'row',
-
     gap: 10,
-
     marginTop: -12,
   },
 
   flowCard: {
     ...cardStyle,
-
     flex: 1,
-
     padding: 12,
-
     alignItems: 'center',
   },
 
   flowIcon: {
     width: 36,
     height: 36,
-
     borderRadius: 12,
-
     backgroundColor: '#E9F5F6',
-
     alignItems: 'center',
-
     justifyContent: 'center',
   },
 
   flowTitle: {
     fontSize: 16,
-
     fontWeight: '700',
-
     color: C.text,
-
     marginTop: 8,
   },
 
   flowDesc: {
     fontSize: 14,
-
     color: C.muted,
-
     textAlign: 'center',
-
     marginTop: 2,
   },
 
@@ -2329,48 +2919,35 @@ const styles = StyleSheet.create({
 
   metricCard: {
     ...cardStyle,
-
     flexDirection: 'row',
-
     alignItems: 'center',
-
     gap: 14,
-
     padding: 15,
   },
 
   metricIcon: {
     width: 48,
     height: 48,
-
     borderRadius: 16,
-
     alignItems: 'center',
-
     justifyContent: 'center',
   },
 
   metricLabel: {
     fontSize: 15,
-
     color: C.muted,
   },
 
   metricValue: {
     fontSize: 26,
-
     fontWeight: '800',
-
     color: C.deep,
-
     marginTop: 2,
   },
 
   metricHint: {
     fontSize: 13,
-
     color: C.muted,
-
     marginTop: 2,
   },
 
@@ -2381,35 +2958,24 @@ const styles = StyleSheet.create({
 
   alert: {
     flexDirection: 'row',
-
     alignItems: 'center',
-
     gap: 8,
-
     backgroundColor: '#ffdcdc',
-
     borderColor: '#f2aeae',
-
     borderWidth: 1,
-
     borderRadius: 16,
-
     padding: 15,
-
     marginTop: -10,
   },
 
   alertNormal: {
     backgroundColor: '#ECFDF3',
-
     borderColor: '#B7E4C7',
   },
 
   alertText: {
     flex: 1,
-
     fontSize: 16,
-
     color: C.text,
   },
 
@@ -2420,27 +2986,18 @@ const styles = StyleSheet.create({
 
   cta: {
     flexDirection: 'row',
-
     alignItems: 'center',
-
     justifyContent: 'center',
-
     gap: 8,
-
     backgroundColor: C.deep,
-
     borderRadius: 16,
-
     paddingVertical: 15,
-
     marginTop: -10,
   },
 
   ctaText: {
     color: C.white,
-
     fontWeight: '700',
-
     fontSize: 17.5,
   },
 
@@ -2451,12 +3008,232 @@ const styles = StyleSheet.create({
 
   footer: {
     textAlign: 'center',
-
     fontSize: 11.5,
-
     color: C.muted,
+    marginBottom: 100,
+  },
 
-    marginTop: 2,
+
+  // ========================================================
+  // NOTIFICAÇÕES
+  // ========================================================
+
+  notificationOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor:
+      'rgba(0,0,0,0.35)',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingTop: 85,
+    paddingHorizontal: 16,
+    zIndex: 100,
+  },
+
+  notificationBox: {
+    width: '100%',
+    maxHeight: 450,
+    backgroundColor: C.card,
+    borderRadius: 18,
+    padding: 18,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+  },
+
+  notificationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+
+  notificationTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: C.deep,
+  },
+
+  notificationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+
+  notificationText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+
+  notificationItemTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: C.text,
+  },
+
+  notificationItemText: {
+    fontSize: 13,
+    color: C.muted,
+    marginTop: 3,
+  },
+
+  noNotification: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 30,
+  },
+
+  noNotificationText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: C.muted,
+  },
+
+
+  // ========================================================
+  // FLUXO
+  // ========================================================
+
+  fluxoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor:
+      'rgba(0,0,0,0.35)',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingTop: 70,
+    paddingHorizontal: 16,
+    zIndex: 200,
+  },
+
+  fluxoBox: {
+    width: '100%',
+    maxHeight: 600,
+    backgroundColor: C.card,
+    borderRadius: 20,
+    padding: 18,
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
+  },
+
+  fluxoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+    paddingBottom: 12,
+  },
+
+  fluxoTitle: {
+    fontSize: 21,
+    fontWeight: '800',
+    color: C.deep,
+  },
+
+  fluxoSubtitle: {
+    fontSize: 12,
+    color: C.muted,
+    marginTop: 3,
+  },
+
+  fluxoClose: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#E9F2F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  fluxoLoading: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+
+  fluxoLoadingText: {
+    fontSize: 14,
+    color: C.muted,
+    marginTop: 12,
+  },
+
+  fluxoList: {
+    marginTop: 10,
+  },
+
+  fluxoItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+
+  fluxoItemIcon: {
+    width: 45,
+    height: 45,
+    borderRadius: 13,
+    backgroundColor: '#E9F5F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  fluxoItemContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+
+  fluxoItemTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: C.deep,
+  },
+
+  fluxoItemText: {
+    fontSize: 13,
+    color: C.muted,
+    marginTop: 3,
+  },
+
+  fluxoEmpty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+
+  fluxoEmptyTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: C.text,
+    marginTop: 10,
+  },
+
+  fluxoEmptyText: {
+    fontSize: 12,
+    color: C.muted,
+    textAlign: 'center',
+    marginTop: 5,
   },
 
 });

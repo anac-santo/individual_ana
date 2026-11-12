@@ -16,9 +16,12 @@ import {
   StatusBar,
   ActivityIndicator,
   RefreshControl,
+  Modal,
+  Platform,
 } from "react-native";
 
 import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 
 import {
   Ionicons,
@@ -34,24 +37,15 @@ import {
 // ============================================================
 // EMULADOR ANDROID
 // ============================================================
-//
-// 10.0.2.2 = computador onde o Flask está rodando
-//
+
 const API_URL = "http://10.0.2.2:5000";
 
 
 // ============================================================
 // CELULAR FÍSICO
 // ============================================================
-//
-// Se estiver usando Expo Go em celular físico,
-// substitua pelo IP do computador.
-//
-// Exemplo:
-//
+
 // const API_URL = "http://192.168.1.100:5000";
-//
-// ============================================================
 
 
 // ============================================================
@@ -108,6 +102,7 @@ function transformarEmReal(valor) {
 // ============================================================
 
 function normalizarTipo(tipo) {
+
   if (!tipo) {
     return "";
   }
@@ -128,6 +123,80 @@ function normalizarTipo(tipo) {
   }
 
   return tipo;
+}
+
+// ============================================================
+// LIQUID GLASS
+// ============================================================
+
+const VIDRO_PADRAO = [
+  "rgba(255,255,255,0.70)",
+  "rgba(255,255,255,0.22)",
+];
+
+const VIDRO_ATIVO = [
+  "rgba(15,163,163,0.95)",
+  "rgba(15,163,163,0.62)",
+];
+
+function Vidro({
+  children,
+  style,
+  contentStyle,
+  radius = 16,
+  intensity = 40,
+  cores = VIDRO_PADRAO,
+  corSombra = C.brandDeep,
+  corBorda = "rgba(255,255,255,0.9)",
+  larguraBorda = 1.5,
+}) {
+  return (
+    // Camada 1: sombra
+    <View
+      style={[
+        styles.vidroSombra,
+        { borderRadius: radius, shadowColor: corSombra },
+        style,
+      ]}
+    >
+      {/* Camada 2: recorte arredondado (é ela que dá a forma) */}
+      <View style={{ borderRadius: radius, overflow: "hidden" }}>
+        {/* Camada 3: blur */}
+        <BlurView
+          intensity={intensity}
+          tint="light"
+          experimentalBlurMethod={
+            Platform.OS === "android" ? "dimezisBlurView" : "none"
+          }
+          style={contentStyle}
+        >
+          {/* Reflexo diagonal */}
+          <LinearGradient
+            colors={cores}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            pointerEvents="none"
+            style={StyleSheet.absoluteFill}
+          />
+
+          {children}
+        </BlurView>
+
+        {/* Camada 4: borda por cima de tudo */}
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              borderRadius: radius,
+              borderWidth: larguraBorda,
+              borderColor: corBorda,
+            },
+          ]}
+        />
+      </View>
+    </View>
+  );
 }
 
 
@@ -207,6 +276,26 @@ export default function MovimentacaoScreen({
 
 
   // ==========================================================
+  // NOTIFICAÇÕES
+  // ==========================================================
+
+  const [
+    produtosCriticos,
+    setProdutosCriticos,
+  ] = useState([]);
+
+  const [
+    produtosBaixo,
+    setProdutosBaixo,
+  ] = useState([]);
+
+  const [
+    mostrarNotificacoes,
+    setMostrarNotificacoes,
+  ] = useState(false);
+
+
+  // ==========================================================
   // BUSCAR MOVIMENTAÇÕES
   // ==========================================================
 
@@ -249,10 +338,6 @@ export default function MovimentacaoScreen({
           );
 
 
-        // ====================================================
-        // VERIFICA STATUS HTTP
-        // ====================================================
-
         if (!resposta.ok) {
 
           throw new Error(
@@ -261,10 +346,6 @@ export default function MovimentacaoScreen({
 
         }
 
-
-        // ====================================================
-        // CONVERTE JSON
-        // ====================================================
 
         const dados =
           await resposta.json();
@@ -277,10 +358,6 @@ export default function MovimentacaoScreen({
         console.log(dados);
 
 
-        // ====================================================
-        // VERIFICA API
-        // ====================================================
-
         if (!dados.sucesso) {
 
           throw new Error(
@@ -291,10 +368,6 @@ export default function MovimentacaoScreen({
         }
 
 
-        // ====================================================
-        // LISTA
-        // ====================================================
-
         const listaAPI =
           Array.isArray(
             dados.movimentacoes
@@ -302,10 +375,6 @@ export default function MovimentacaoScreen({
             ? dados.movimentacoes
             : [];
 
-
-        // ====================================================
-        // NORMALIZA DADOS
-        // ====================================================
 
         const listaFormatada =
           listaAPI.map(
@@ -352,10 +421,6 @@ export default function MovimentacaoScreen({
           );
 
 
-        // ====================================================
-        // SALVA
-        // ====================================================
-
         setMovimentacoes(
           listaFormatada
         );
@@ -385,15 +450,118 @@ export default function MovimentacaoScreen({
 
 
   // ==========================================================
+  // BUSCAR NOTIFICAÇÕES DO ESTOQUE
+  // ==========================================================
+
+  const carregarNotificacoes =
+    useCallback(async () => {
+
+      try {
+
+        const resposta =
+          await fetch(
+            `${API_URL}/api/dashboard`,
+            {
+              method: "GET",
+
+              headers: {
+                Accept:
+                  "application/json",
+              },
+            }
+          );
+
+
+        if (!resposta.ok) {
+
+          throw new Error(
+            `Erro HTTP ${resposta.status}`
+          );
+
+        }
+
+
+        const dados =
+          await resposta.json();
+
+
+        const criticos =
+          Array.isArray(
+            dados?.produtosCriticos
+          )
+            ? dados.produtosCriticos
+            : [];
+
+
+        const baixo =
+          Array.isArray(
+            dados?.produtosBaixo
+          )
+            ? dados.produtosBaixo
+            : [];
+
+
+        setProdutosCriticos(
+          criticos
+        );
+
+        setProdutosBaixo(
+          baixo
+        );
+
+
+      } catch (error) {
+
+        console.log(
+          "ERRO AO CARREGAR NOTIFICAÇÕES:"
+        );
+
+        console.log(error);
+
+      }
+
+    }, []);
+
+
+  // ==========================================================
   // CARREGAR AO ABRIR
   // ==========================================================
 
   useEffect(() => {
 
     carregarMovimentacoes();
+    carregarNotificacoes();
 
   }, [
     carregarMovimentacoes,
+    carregarNotificacoes,
+  ]);
+
+
+  // ==========================================================
+  // ATUALIZAR NOTIFICAÇÕES AUTOMATICAMENTE
+  // ==========================================================
+
+  useEffect(() => {
+
+    const intervalo =
+      setInterval(() => {
+
+        carregarNotificacoes();
+
+      }, 30000);
+
+
+    return () => {
+
+      clearInterval(
+        intervalo
+      );
+
+    };
+
+  }, [
+    carregarNotificacoes,
   ]);
 
 
@@ -407,10 +575,21 @@ export default function MovimentacaoScreen({
       setRefreshing(true);
 
       carregarMovimentacoes();
+      carregarNotificacoes();
 
     }, [
       carregarMovimentacoes,
+      carregarNotificacoes,
     ]);
+
+
+  // ==========================================================
+  // QUANTIDADE DE ALERTAS
+  // ==========================================================
+
+  const quantidadeAlertas =
+    produtosCriticos.length +
+    produtosBaixo.length;
 
 
   // ==========================================================
@@ -491,10 +670,6 @@ export default function MovimentacaoScreen({
       ];
 
 
-      // ======================================================
-      // FILTRO TIPO
-      // ======================================================
-
       if (
         filtro !== "Todos"
       ) {
@@ -508,10 +683,6 @@ export default function MovimentacaoScreen({
 
       }
 
-
-      // ======================================================
-      // PESQUISA
-      // ======================================================
 
       if (
         busca.trim() !== ""
@@ -577,10 +748,6 @@ export default function MovimentacaoScreen({
       }
 
 
-      // ======================================================
-      // PERFIL
-      // ======================================================
-
       if (
         rota === "Perfil"
       ) {
@@ -604,10 +771,6 @@ export default function MovimentacaoScreen({
       }
 
 
-      // ======================================================
-      // HOME
-      // ======================================================
-
       if (
         rota === "Home"
       ) {
@@ -624,10 +787,6 @@ export default function MovimentacaoScreen({
       }
 
 
-      // ======================================================
-      // DASHBOARD
-      // ======================================================
-
       if (
         rota === "Dashboard"
       ) {
@@ -643,10 +802,6 @@ export default function MovimentacaoScreen({
         return;
       }
 
-
-      // ======================================================
-      // OUTRAS ROTAS
-      // ======================================================
 
       navigation.navigate(
         rota,
@@ -746,6 +901,22 @@ export default function MovimentacaoScreen({
         }
       />
 
+{/* FUNDO PARA O VIDRO APARECER */}
+<View pointerEvents="none" style={StyleSheet.absoluteFill}>
+  <View style={[styles.blob, { top: 190, left: -70, width: 230, height: 230, backgroundColor: "rgba(15,163,163,0.40)" }]} />
+  <View style={[styles.blob, { top: 260, right: -80, width: 220, height: 220, backgroundColor: "rgba(11,59,90,0.22)" }]} />
+  <View style={[styles.blob, { top: 430, left: 90, width: 170, height: 170, backgroundColor: "rgba(224,87,128,0.20)" }]} />
+
+  <BlurView
+    intensity={80}
+    tint="light"
+    experimentalBlurMethod={
+      Platform.OS === "android" ? "dimezisBlurView" : "none"
+    }
+    style={StyleSheet.absoluteFill}
+  />
+</View>
+
 
       {/* =====================================================
           CABEÇALHO
@@ -834,6 +1005,9 @@ export default function MovimentacaoScreen({
                 styles.iconBtn
               }
               activeOpacity={0.8}
+              onPress={() =>
+                setMostrarNotificacoes(true)
+              }
             >
 
               <Ionicons
@@ -842,9 +1016,14 @@ export default function MovimentacaoScreen({
                 color="#fff"
               />
 
-              <View
-                style={styles.dot}
-              />
+
+              {quantidadeAlertas > 0 && (
+
+                <View
+                  style={styles.dot}
+                />
+
+              )}
 
             </TouchableOpacity>
 
@@ -1088,60 +1267,28 @@ export default function MovimentacaoScreen({
             PESQUISA
         ================================================= */}
 
-        <View
-          style={
-            styles.searchBox
-          }
-        >
+<Vidro radius={16} contentStyle={styles.searchBox}>
+  <Feather name="search" size={18} color={C.muted} />
 
-          <Feather
-            name="search"
-            size={18}
-            color={C.muted}
-          />
+  <TextInput
+    value={busca}
+    onChangeText={setBusca}
+    placeholder={"Buscar produto, fornecedor ou cliente"}
+    placeholderTextColor={C.muted}
+    style={styles.searchInput}
+    returnKeyType="search"
+    autoCorrect={false}
+  />
 
-
-          <TextInput
-            value={busca}
-            onChangeText={
-              setBusca
-            }
-            placeholder={
-              "Buscar produto, fornecedor ou cliente"
-            }
-            placeholderTextColor={
-              C.muted
-            }
-            style={
-              styles.searchInput
-            }
-            returnKeyType="search"
-            autoCorrect={false}
-          />
-
-
-          {busca.length > 0 && (
-
-            <TouchableOpacity
-              onPress={() =>
-                setBusca("")
-              }
-              style={
-                styles.clearBtn
-              }
-            >
-
-              <Feather
-                name="x"
-                size={16}
-                color={C.muted}
-              />
-
-            </TouchableOpacity>
-
-          )}
-
-        </View>
+  {busca.length > 0 && (
+    <TouchableOpacity
+      onPress={() => setBusca("")}
+      style={styles.clearBtn}
+    >
+      <Feather name="x" size={16} color={C.muted} />
+    </TouchableOpacity>
+  )}
+</Vidro>
 
 
         {/* =================================================
@@ -1161,44 +1308,35 @@ export default function MovimentacaoScreen({
           }
         >
 
-          {FILTROS.map(
-            (item) => {
+{FILTROS.map((item) => {
+  const estaAtivo = item === filtro;
 
-              const estaAtivo =
-                item === filtro;
-
-
-              return (
-
-                <TouchableOpacity
-                  key={item}
-                  onPress={() =>
-                    setFiltro(item)
-                  }
-                  activeOpacity={0.8}
-                  style={[
-                    styles.chip,
-                    estaAtivo &&
-                      styles.chipAtivo,
-                  ]}
-                >
-
-                  <Text
-                    style={[
-                      styles.chipTxt,
-                      estaAtivo &&
-                        styles.chipTxtAtivo,
-                    ]}
-                  >
-                    {item}
-                  </Text>
-
-                </TouchableOpacity>
-
-              );
-
-            }
-          )}
+  return (
+    <TouchableOpacity
+      key={item}
+      onPress={() => setFiltro(item)}
+      activeOpacity={0.85}
+      style={styles.chipWrap}
+    >
+      <Vidro
+        radius={999}
+        intensity={estaAtivo ? 20 : 40}
+        cores={estaAtivo ? VIDRO_ATIVO : VIDRO_PADRAO}
+        corSombra={estaAtivo ? C.brand : C.brandDeep}
+        contentStyle={styles.chipInner}
+      >
+        <Text
+          style={[
+            styles.chipTxt,
+            estaAtivo && styles.chipTxtAtivo,
+          ]}
+        >
+          {item}
+        </Text>
+      </Vidro>
+    </TouchableOpacity>
+  );
+})}
 
         </ScrollView>
 
@@ -1548,6 +1686,264 @@ export default function MovimentacaoScreen({
 
       </ScrollView>
 
+
+      {/* =====================================================
+          JANELA DE NOTIFICAÇÕES
+      ===================================================== */}
+
+      <Modal
+        visible={mostrarNotificacoes}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() =>
+          setMostrarNotificacoes(false)
+        }
+      >
+
+        <View
+          style={
+            styles.notificationBackground
+          }
+        >
+
+          <View
+            style={
+              styles.notificationBox
+            }
+          >
+
+            <View
+              style={
+                styles.notificationHeader
+              }
+            >
+
+              <View>
+
+                <Text
+                  style={
+                    styles.notificationTitle
+                  }
+                >
+                  Notificações
+                </Text>
+
+                <Text
+                  style={
+                    styles.notificationSubtitle
+                  }
+                >
+                  Alertas do estoque
+                </Text>
+
+              </View>
+
+
+              <TouchableOpacity
+                onPress={() =>
+                  setMostrarNotificacoes(false)
+                }
+                style={
+                  styles.notificationClose
+                }
+              >
+
+                <Feather
+                  name="x"
+                  size={22}
+                  color={C.muted}
+                />
+
+              </TouchableOpacity>
+
+            </View>
+
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={
+                styles.notificationList
+              }
+            >
+
+              {produtosCriticos.map(
+                (item, index) => (
+
+                  <View
+                    key={
+                      item.id ||
+                      `critico-${index}`
+                    }
+                    style={
+                      styles.notificationItem
+                    }
+                  >
+
+                    <View
+                      style={[
+                        styles.notificationIcon,
+                        {
+                          backgroundColor:
+                            "rgba(224,87,128,0.12)",
+                        },
+                      ]}
+                    >
+
+                      <Feather
+                        name="alert-triangle"
+                        size={19}
+                        color={
+                          C.red
+                        }
+                      />
+
+                    </View>
+
+
+                    <View
+                      style={
+                        styles.notificationTextArea
+                      }
+                    >
+
+                      <Text
+                        style={
+                          styles.notificationItemTitle
+                        }
+                      >
+                        Estoque crítico
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.notificationItemText
+                        }
+                      >
+                        {item?.nome ||
+                          item?.produto ||
+                          "Produto"}{" "}
+                        está com estoque crítico.
+                      </Text>
+
+                    </View>
+
+                  </View>
+
+                )
+              )}
+
+
+              {produtosBaixo.map(
+                (item, index) => (
+
+                  <View
+                    key={
+                      item.id ||
+                      `baixo-${index}`
+                    }
+                    style={
+                      styles.notificationItem
+                    }
+                  >
+
+                    <View
+                      style={[
+                        styles.notificationIcon,
+                        {
+                          backgroundColor:
+                            "rgba(15,163,163,0.12)",
+                        },
+                      ]}
+                    >
+
+                      <Feather
+                        name="alert-circle"
+                        size={19}
+                        color={
+                          C.brand
+                        }
+                      />
+
+                    </View>
+
+
+                    <View
+                      style={
+                        styles.notificationTextArea
+                      }
+                    >
+
+                      <Text
+                        style={
+                          styles.notificationItemTitle
+                        }
+                      >
+                        Estoque baixo
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.notificationItemText
+                        }
+                      >
+                        {item?.nome ||
+                          item?.produto ||
+                          "Produto"}{" "}
+                        está com estoque baixo.
+                      </Text>
+
+                    </View>
+
+                  </View>
+
+                )
+              )}
+
+
+              {quantidadeAlertas === 0 && (
+
+                <View
+                  style={
+                    styles.notificationEmpty
+                  }
+                >
+
+                  <Feather
+                    name="check-circle"
+                    size={35}
+                    color={
+                      C.brand
+                    }
+                  />
+
+                  <Text
+                    style={
+                      styles.notificationEmptyTitle
+                    }
+                  >
+                    Nenhuma notificação
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.notificationEmptyText
+                    }
+                  >
+                    O estoque está normal no momento.
+                  </Text>
+
+                </View>
+
+              )}
+
+            </ScrollView>
+
+          </View>
+
+        </View>
+
+      </Modal>
+
     </View>
 
   );
@@ -1737,25 +2133,7 @@ const styles = StyleSheet.create({
   // PESQUISA
   // ==========================================================
 
-  searchBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: C.card,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: C.border,
-    shadowColor: "#0B3B5A",
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    elevation: 2,
-  },
+  
 
   searchInput: {
     flex: 1,
@@ -1773,6 +2151,53 @@ const styles = StyleSheet.create({
   // FILTROS
   // ==========================================================
 
+  // ==========================================================
+  // LIQUID GLASS
+  // ==========================================================
+  
+  vidroSombra: {
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  
+
+  
+
+  
+  blob: {
+    position: "absolute",
+    borderRadius: 999,
+  },
+  
+  // ==========================================================
+  // PESQUISA
+  // ==========================================================
+  
+  searchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    border: 50,
+  },
+  
+  // ==========================================================
+  // FILTROS
+  // ==========================================================
+  
+  chipWrap: {
+    marginRight: 8,
+  },
+  
+  chipInner: {
+    paddingHorizontal: 28,
+    paddingVertical: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   filtrosScroll: {
     marginTop: 12,
   },
@@ -1781,20 +2206,9 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
 
-  chip: {
-    paddingHorizontal: 28,
-    paddingVertical: 13,
-    borderRadius: 999,
-    backgroundColor: C.card,
-    borderWidth: 1,
-    borderColor: C.border,
-    marginRight: 8,
-  },
+  
 
-  chipAtivo: {
-    backgroundColor: C.brand,
-    borderColor: C.brand,
-  },
+ 
 
   chipTxt: {
     fontSize: 16.5,
@@ -2056,6 +2470,115 @@ const styles = StyleSheet.create({
   tabLabelAtivo: {
     color: C.brand,
     fontWeight: "700",
+  },
+
+
+  // ==========================================================
+  // NOTIFICAÇÕES
+  // ==========================================================
+
+  notificationBackground: {
+    flex: 1,
+    backgroundColor:
+      "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+
+  notificationBox: {
+    backgroundColor: C.card,
+    borderRadius: 22,
+    padding: 18,
+    maxHeight: "75%",
+  },
+
+  notificationHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+    paddingBottom: 14,
+  },
+
+  notificationTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: C.brandDeep,
+  },
+
+  notificationSubtitle: {
+    fontSize: 13,
+    color: C.muted,
+    marginTop: 3,
+  },
+
+  notificationClose: {
+    height: 38,
+    width: 38,
+    borderRadius: 12,
+    backgroundColor: "#F1F5F8",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  notificationList: {
+    marginTop: 12,
+  },
+
+  notificationItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "#F3F7F9",
+    borderRadius: 15,
+    padding: 12,
+    marginBottom: 10,
+  },
+
+  notificationIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  notificationTextArea: {
+    flex: 1,
+  },
+
+  notificationItemTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: C.brandDeep,
+  },
+
+  notificationItemText: {
+    fontSize: 13,
+    color: C.muted,
+    marginTop: 3,
+    lineHeight: 18,
+  },
+
+  notificationEmpty: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 40,
+  },
+
+  notificationEmptyTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: C.brandDeep,
+    marginTop: 12,
+  },
+
+  notificationEmptyText: {
+    fontSize: 13,
+    color: C.muted,
+    marginTop: 5,
+    textAlign: "center",
   },
 
 });

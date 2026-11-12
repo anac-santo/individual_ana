@@ -17,10 +17,12 @@ import {
   StatusBar,
   SafeAreaView,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 
 import Svg, { Circle } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 
 /* ==================================================================
    CONFIGURAÇÃO DA API
@@ -820,6 +822,9 @@ export default function TelaDashboard({
   const [erro, setErro] =
     useState(null);
 
+  const [alturaHeader, setAlturaHeader] = 
+    useState(0);
+
   /* ================================================================
      BUSCAR DASHBOARD
      ================================================================ */
@@ -1071,82 +1076,87 @@ export default function TelaDashboard({
       {/* ==========================================================
           HEADER
           ========================================================== */}
-
-      <LinearGradient
-        colors={[
-          COLORS.navy,
-          COLORS.ocean,
-          COLORS.teal,
-        ]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.header}
+<BlurView
+  intensity={20}
+  tint="light"
+  experimentalBlurMethod={
+    Platform.OS === 'android' ? 'dimezisBlurView' : 'none'
+  }
+  style={styles.headerBlur}
+  onLayout={(e) => setAlturaHeader(e.nativeEvent.layout.height)}
+>
+  <LinearGradient
+    colors={[
+      'rgba(27, 58, 92, 0.60)',
+      'rgba(42, 107, 150, 0.50)',
+      'rgba(47, 168, 181, 0.45)',
+    ]}
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 1 }}
+    style={styles.header}
+  >
+    <View style={styles.headerTopo}>
+      <View
+        style={{
+          flex: 1,
+          minWidth: 0,
+        }}
       >
+        <Text style={styles.headerTitulo}>
+          Dashboard
+        </Text>
 
-        
-        <View style={styles.headerTopo}>
-          <View
-            style={{
-              flex: 1,
-              minWidth: 0,
-            }}
-          >
-            <Text style={styles.headerTitulo}>
-              Dashboard
-            </Text>
+        <Text
+          style={styles.headerSub}
+          numberOfLines={2}
+        >
+          Visão geral do estoque,
+          movimentações e resultado
+          financeiro
+        </Text>
+      </View>
 
-            <Text
-              style={styles.headerSub}
-              numberOfLines={2}
-            >
-              Visão geral do estoque,
-              movimentações e resultado
-              financeiro
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            style={styles.headerBotao}
-            activeOpacity={0.8}
-            onPress={onRefresh}
-            disabled={refreshing}
-          >
-            {refreshing ? (
-              <ActivityIndicator
-                size="small"
-                color="#FFF"
-              />
-            ) : (
-              <Text
-                style={
-                  styles.headerBotaoTexto
-                }
-              >
-                Atualizar
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
+      <TouchableOpacity
+        style={styles.headerBotao}
+        activeOpacity={0.8}
+        onPress={onRefresh}
+        disabled={refreshing}
+      >
+        {refreshing ? (
+          <ActivityIndicator
+            size="small"
+            color="#FFF"
+          />
+        ) : (
+          <Text style={styles.headerBotaoTexto}>
+            Atualizar
+          </Text>
+        )}
+      </TouchableOpacity>
+    </View>
+  </LinearGradient>
+</BlurView>
 
       {/* ==========================================================
           CONTEÚDO
           ========================================================== */}
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={
-          styles.conteudo
-        }
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={COLORS.teal}
-          />
-        }
-      >
+<ScrollView
+  style={styles.scroll}
+  contentContainerStyle={[
+    styles.conteudo,
+    { paddingTop: alturaHeader + 16 },
+  ]}
+  showsVerticalScrollIndicator={false}
+  refreshControl={
+    <RefreshControl
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+      tintColor={COLORS.teal}
+      progressViewOffset={alturaHeader} // Android
+    />
+  }
+>
 
         {/* ========================================================
             CARREGANDO
@@ -1480,14 +1490,33 @@ const styles = StyleSheet.create({
      HEADER
      ================================================================ */
 
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 22,
-    paddingBottom: 26,
+     headerBlur: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 10,
+    
+      borderBottomLeftRadius: 26,
+      borderBottomRightRadius: 26,
+      overflow: 'hidden',
+    
+      backgroundColor: 'rgba(255, 255, 255, 0.16)',
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderColor: 'rgba(255, 255, 255, 0.75)',
+    
+      shadowColor: '#1B3A5C',
+      shadowOpacity: 0.16,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 8,
+    },
 
-    borderBottomLeftRadius: 26,
-    borderBottomRightRadius: 26,
-  },
+    header: {
+      paddingHorizontal: 20,
+      paddingTop: 22,
+      paddingBottom: 26,
+    },
 
   headerTopo: {
     flexDirection: 'row',
